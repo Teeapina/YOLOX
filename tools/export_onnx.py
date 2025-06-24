@@ -94,7 +94,7 @@ def main():
         args.output_name,
         input_names=[args.input],
         output_names=[args.output],
-        dynamic_axes={args.input: {0: 'batch'},
+        dynamic_axes={args.input: {0: 'batch', 2: 'height', 3: 'width'},
                       args.output: {0: 'batch'}} if args.dynamic else None,
         opset_version=args.opset,
     )
