@@ -61,7 +61,7 @@ class COCODataset(CacheDataset):
         self.json_file = json_file
 
         self.coco = COCO(os.path.join(self.data_dir, self.json_file))
-        remove_useless_info(self.coco)
+        # remove_useless_info(self.coco)
         self.ids = self.coco.getImgIds()
         self.num_imgs = len(self.ids)
         self.class_ids = sorted(self.coco.getCatIds())
