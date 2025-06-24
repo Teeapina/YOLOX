@@ -304,7 +304,7 @@ class Exp(BaseExp):
         return COCODataset(
             data_dir=self.data_dir,
             json_file=self.val_ann if not testdev else self.test_ann,
-            name="valid",
+            name="valid" if not testdev else "test",
             img_size=self.test_size,
             preproc=ValTransform(legacy=legacy),
         )
