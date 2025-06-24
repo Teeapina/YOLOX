@@ -72,7 +72,7 @@ class COCODataset(CacheDataset):
         self.preproc = preproc
         self.annotations = self._load_coco_annotations()
 
-        path_filename = [os.path.join(name, anno[3]) for anno in self.annotations]
+        path_filename = [os.path.join(anno[3]) for anno in self.annotations]
         super().__init__(
             input_dimension=img_size,
             num_imgs=self.num_imgs,
