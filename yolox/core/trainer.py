@@ -177,6 +177,9 @@ class Trainer:
         self.evaluator = self.exp.get_evaluator(
             batch_size=self.args.batch_size, is_distributed=self.is_distributed
         )
+
+        self.val_loader = self.evaluator.dataloader  
+        
         # Tensorboard and Wandb loggers
         if self.rank == 0:
             if self.args.logger == "tensorboard":
