@@ -396,6 +396,43 @@ class Trainer:
             self.mlflow_logger.save_checkpoints(self.args, self.exp, self.file_name, self.epoch,
                                                 metadata, update_best_ckpt)
 
+    
+    @torch.no_grad()                       # ──► NO grads, so cost is low
+    def _val_one_epoch(self):
+        self.model.train()                 # need raw logits for YOLOX loss
+        if self.use_model_ema:             # use EMA weights if you keep them
+            model_eval = self.ema_model.ema
+        else:
+            model_eval = self.model
+    
+        total_iou = total_l1 = total_obj = total_cls = total_loss = 0
+        n = 0
+    
+        for inps, targets, _ in self.val_loader:  # same loader exp.get_eval_loader()
+            inps  = inps.to(self.data_type)
+            targets = targets.to(self.data_type)
+            targets.requires_grad = False
+            inps, targets = self.exp.preprocess(inps, targets, self.input_size)
+    
+            with torch.cuda.amp.autocast(enabled=self.amp_training):
+                outs = model_eval(inps, targets)   # ⇐ **same API as train_one_iter**
+    
+            total_loss += outs["total_loss"].item()
+            total_iou  += outs["iou_loss"].item()
+            total_l1   += outs["l1_loss"].item()
+            total_obj  += outs["obj_loss"].item()
+            total_cls  += outs["cls_loss"].item()
+            n += 1
+    
+        # mean across val set
+        return {
+            "val_total_loss": total_loss / n,
+            "val_iou_loss":   total_iou  / n,
+            "val_l1_loss":    total_l1   / n,
+            "val_obj_loss":   total_obj  / n,
+            "val_cls_loss":   total_cls  / n,
+        }
+
     def save_ckpt(self, ckpt_name, update_best_ckpt=False, ap=None):
         if self.rank == 0:
             save_model = self.ema_model.ema if self.use_model_ema else self.model
