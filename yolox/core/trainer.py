@@ -235,35 +235,35 @@ class Trainer:
     def after_epoch(self):
         self.save_ckpt(ckpt_name="latest")
 
-        # ---- run lightweight val‑loss every epoch ----
-        loss_stats = self._val_one_epoch()              # returns the 5‑key dict
+        # # ---- run lightweight val‑loss every epoch ----
+        # loss_stats = self._val_one_epoch()              # returns the 5‑key dict
     
-        # average across ranks
-        loss_stats = {
-            k: self._dist_avg(torch.tensor(v, device=self.device)).item()
-            for k, v in loss_stats.items()
-        }
+        # # average across ranks
+        # loss_stats = {
+        #     k: self._dist_avg(torch.tensor(v, device=self.device)).item()
+        #     for k, v in loss_stats.items()
+        # }
     
-        if self.rank == 0:
-            logger.info(
-                "Val‑loss │ " + ", ".join(f"{k}: {v:.4f}" for k, v in loss_stats.items())
-            )
+        # if self.rank == 0:
+        #     logger.info(
+        #         "Val‑loss │ " + ", ".join(f"{k}: {v:.4f}" for k, v in loss_stats.items())
+        #     )
     
-            if self.args.logger == "tensorboard":
-                for k, v in loss_stats.items():
-                    self.tblogger.add_scalar(f"val/{k}", v, self.epoch + 1)
+        #     if self.args.logger == "tensorboard":
+        #         for k, v in loss_stats.items():
+        #             self.tblogger.add_scalar(f"val/{k}", v, self.epoch + 1)
     
-            elif self.args.logger == "wandb":
-                self.wandb_logger.log_metrics(
-                    {f"val/{k}": v for k, v in loss_stats.items()},
-                    step=self.progress_in_iter,
-                )
+        #     elif self.args.logger == "wandb":
+        #         self.wandb_logger.log_metrics(
+        #             {f"val/{k}": v for k, v in loss_stats.items()},
+        #             step=self.progress_in_iter,
+        #         )
     
-            elif self.args.logger == "mlflow":
-                self.mlflow_logger.on_log(
-                    self.args, self.exp, self.epoch + 1,
-                    {f"val/{k}": v for k, v in loss_stats.items()},
-                )
+        #     elif self.args.logger == "mlflow":
+        #         self.mlflow_logger.on_log(
+        #             self.args, self.exp, self.epoch + 1,
+        #             {f"val/{k}": v for k, v in loss_stats.items()},
+        #         )
 
         if (self.epoch + 1) % self.exp.eval_interval == 0:
             all_reduce_norm(self.model)
