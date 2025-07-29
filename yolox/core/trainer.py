@@ -179,6 +179,7 @@ class Trainer:
         )
 
         self.val_loader = self.exp.get_eval_loader(batch_size=self.args.batch_size, is_distributed=self.is_distributed)
+        self.val_prefetcher = DataPrefetcher(self.val_loader)
         
         # Tensorboard and Wandb loggers
         if self.rank == 0:
@@ -236,34 +237,16 @@ class Trainer:
         self.save_ckpt(ckpt_name="latest")
 
         # ---- run lightweight val‑loss every epoch ----
-        loss_stats = self._val_one_epoch()              # returns the 5‑key dict
+        loss_stats = self._val_one_epoch()          
     
-        # average across ranks
-        loss_stats = {
-            k: self._dist_avg(torch.tensor(v, device=self.device)).item()
-            for k, v in loss_stats.items()
-        }
+        logger.info(
+            "Val‑loss │ " + loss_stats
+        )
+
+        if self.args.logger == "tensorboard":
+            self.tblogger.add_scalar(f"val/total", loss_stats, self.epoch + 1)
     
-        if self.rank == 0:
-            logger.info(
-                "Val‑loss │ " + ", ".join(f"{k}: {v:.4f}" for k, v in loss_stats.items())
-            )
-    
-            if self.args.logger == "tensorboard":
-                for k, v in loss_stats.items():
-                    self.tblogger.add_scalar(f"val/{k}", v, self.epoch + 1)
-    
-            elif self.args.logger == "wandb":
-                self.wandb_logger.log_metrics(
-                    {f"val/{k}": v for k, v in loss_stats.items()},
-                    step=self.progress_in_iter,
-                )
-    
-            elif self.args.logger == "mlflow":
-                self.mlflow_logger.on_log(
-                    self.args, self.exp, self.epoch + 1,
-                    {f"val/{k}": v for k, v in loss_stats.items()},
-                )
+
 
         if (self.epoch + 1) % self.exp.eval_interval == 0:
             all_reduce_norm(self.model)
@@ -432,41 +415,23 @@ class Trainer:
     
     @torch.no_grad()                       # ──► NO grads, so cost is low
     def _val_one_epoch(self):
-        self.model.train()                 # need raw logits for YOLOX loss
-        if self.use_model_ema:             # use EMA weights if you keep them
-            model_eval = self.ema_model.ema
-        else:
-            model_eval = self.model
-    
-        total_iou = total_l1 = total_obj = total_cls = total_loss = 0
-        n = 0
-    
-        for inps, targets, _, _ in self.val_loader:  # same loader exp.get_eval_loader()
-            
+        
+        total_loss = 0.0
+        for iter in range(len(self.val_loader)):
+            inps, targets = self.val_prefetcher.next()
+            inps = inps.to(self.data_type)
+            targets = targets.to(self.data_type)
             targets.requires_grad = False
             inps, targets = self.exp.preprocess(inps, targets, self.input_size)
 
-            inps    = inps.to(self.device, dtype=self.data_type, non_blocking=True)
-            targets = targets.to(self.device, non_blocking=True)
-    
             with torch.cuda.amp.autocast(enabled=self.amp_training):
-                outs = model_eval(inps, targets)   # ⇐ **same API as train_one_iter**
-    
-            total_loss += outs["total_loss"].item()
-            total_iou  += outs["iou_loss"].item()
-            total_l1   += outs["l1_loss"].item()
-            total_obj  += outs["obj_loss"].item()
-            total_cls  += outs["cls_loss"].item()
-            n += 1
-    
-        # mean across val set
-        return {
-            "val_total_loss": total_loss / n,
-            "val_iou_loss":   total_iou  / n,
-            "val_l1_loss":    total_l1   / n,
-            "val_obj_loss":   total_obj  / n,
-            "val_cls_loss":   total_cls  / n,
-        }
+                outputs = self.model(inps, targets)
+
+            val_loss= outputs["total_loss"]
+
+            total_loss += val_loss.item()
+        return total_loss
+
 
     def _dist_avg(self, value: torch.Tensor):
         if self.is_distributed:
