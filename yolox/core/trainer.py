@@ -240,7 +240,7 @@ class Trainer:
         loss_stats = self._val_one_epoch()          
     
         logger.info(
-            "Val‑loss │ " + loss_stats
+            f"Val‑loss │ {loss_stats}" 
         )
 
         if self.args.logger == "tensorboard":
