@@ -178,7 +178,7 @@ class Trainer:
             batch_size=self.args.batch_size, is_distributed=self.is_distributed
         )
 
-        self.val_loader = self.get_eval_loader(batch_size=self.args.batch_size, is_distributed=self.is_distributed)
+        self.val_loader = self.exp.get_eval_loader(batch_size=self.args.batch_size, is_distributed=self.is_distributed)
         
         # Tensorboard and Wandb loggers
         if self.rank == 0:
