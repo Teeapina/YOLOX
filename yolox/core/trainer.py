@@ -416,6 +416,7 @@ class Trainer:
     @torch.no_grad()                       # ──► NO grads, so cost is low
     def _val_one_epoch(self):
         
+        self.val_prefetcher = DataPrefetcher(self.val_loader)
         total_loss = 0.0
         for iter in range(len(self.val_loader)):
             inps, targets = self.val_prefetcher.next()
