@@ -442,10 +442,12 @@ class Trainer:
         n = 0
     
         for inps, targets, _, _ in self.val_loader:  # same loader exp.get_eval_loader()
-            inps  = inps.to(self.data_type)
-            targets = targets.to(self.data_type)
+            
             targets.requires_grad = False
             inps, targets = self.exp.preprocess(inps, targets, self.input_size)
+
+            inps    = inps.to(self.device, dtype=self.data_type, non_blocking=True)
+            targets = targets.to(self.device, non_blocking=True)
     
             with torch.cuda.amp.autocast(enabled=self.amp_training):
                 outs = model_eval(inps, targets)   # ⇐ **same API as train_one_iter**
