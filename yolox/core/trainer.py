@@ -179,7 +179,12 @@ class Trainer:
         )
 
         self.val_loader = self.exp.get_eval_loader(batch_size=self.args.batch_size, is_distributed=self.is_distributed)
-        self.val_prefetcher = DataPrefetcher(self.val_loader)
+        
+        self.val_criterion = YOLOXLoss(
+            num_classes     = self.exp.num_classes,
+            strides         = self.exp.strides,
+            in_channels     = self.exp.in_channels,
+        ).to(self.device)
         
         # Tensorboard and Wandb loggers
         if self.rank == 0:
@@ -239,12 +244,14 @@ class Trainer:
         # ---- run lightweight val‑loss every epoch ----
         loss_stats = self._val_one_epoch()          
     
-        logger.info(
-            f"Val‑loss │ {loss_stats}" 
-        )
+        if self.rank == 0:
+            logger.info(
+                "Val‑loss │ " + ", ".join(f"{k}: {v:.4f}" for k, v in loss_stats.items())
+            )
 
-        if self.args.logger == "tensorboard":
-            self.tblogger.add_scalar(f"val/total", loss_stats, self.epoch + 1)
+            if self.args.logger == "tensorboard":
+                for k, v in loss_stats.items():
+                    self.tblogger.add_scalar(f"val/{k}", v, self.epoch + 1)
     
 
 
@@ -415,23 +422,30 @@ class Trainer:
     
     @torch.no_grad()                       # ──► NO grads, so cost is low
     def _val_one_epoch(self):
-        
-        self.val_prefetcher = DataPrefetcher(self.val_loader)
-        total_loss = 0.0
-        for iter in range(len(self.val_loader)):
-            inps, targets = self.val_prefetcher.next()
-            inps = inps.to(self.data_type)
-            targets = targets.to(self.data_type)
+        self.model.train()
+
+        for m in self.model.modules():
+            if isinstance(m, (torch.nn.BatchNorm2d, torch.nn.SyncBatchNorm)):
+                m.eval()
+
+        sums = dict(total=0.0, iou=0.0, l1=0.0, obj=0.0, cls=0.0)
+
+        for inps, targets, _, _ in self.val_loader:
+            inps = inps.to(self.device, self.data_type)
+            targets = targets.to(self.device, self.data_type)
             targets.requires_grad = False
-            inps, targets = self.exp.preprocess(inps, targets, self.input_size)
 
             with torch.cuda.amp.autocast(enabled=self.amp_training):
-                outputs = self.model(inps, targets)
+                outs = self.model(inps, targets)
 
-            val_loss= outputs["total_loss"]
+            sums["total"] += outs["total_loss"].item()
+            sums["iou"]   += outs["iou_loss"].item()
+            sums["l1"]    += outs["l1_loss"].item()
+            sums["obj"]   += outs["obj_loss"].item()
+            sums["cls"]   += outs["cls_loss"].item()
 
-            total_loss += val_loss.item()
-        return total_loss
+        n = len(self.val_loader)
+        return {k: v / n for k, v in sums.items()}
 
 
     def _dist_avg(self, value: torch.Tensor):
