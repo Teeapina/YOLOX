@@ -236,17 +236,17 @@ class Trainer:
     def after_epoch(self):
         self.save_ckpt(ckpt_name="latest")
 
-        # ---- run lightweight val‑loss every epoch ----
-        loss_stats = self._val_one_epoch()          
+        # # ---- run lightweight val‑loss every epoch ----
+        # loss_stats = self._val_one_epoch()          
     
-        if self.rank == 0:
-            logger.info(
-                "Val‑loss │ " + ", ".join(f"{k}: {v:.4f}" for k, v in loss_stats.items())
-            )
+        # if self.rank == 0:
+        #     logger.info(
+        #         "Val‑loss │ " + ", ".join(f"{k}: {v:.4f}" for k, v in loss_stats.items())
+        #     )
 
-            if self.args.logger == "tensorboard":
-                for k, v in loss_stats.items():
-                    self.tblogger.add_scalar(f"val/{k}", v, self.epoch + 1)
+        #     if self.args.logger == "tensorboard":
+        #         for k, v in loss_stats.items():
+        #             self.tblogger.add_scalar(f"val/{k}", v, self.epoch + 1)
     
 
 
