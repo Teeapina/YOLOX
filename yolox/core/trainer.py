@@ -434,10 +434,10 @@ class Trainer:
                 outs = self.model(inps, targets)
 
             sums["total"] += outs["total_loss"].item()
-            sums["iou"]   += outs["iou_loss"].item()
-            sums["l1"]    += outs["l1_loss"].item()
-            sums["obj"]   += outs["obj_loss"].item()
-            sums["cls"]   += outs["cls_loss"].item()
+            sums["iou"]   += outs["iou_loss"]
+            sums["l1"]    += outs["l1_loss"]
+            sums["obj"]   += outs["obj_loss"]
+            sums["cls"]   += outs["cls_loss"]
 
         n = len(self.val_loader)
         return {k: v / n for k, v in sums.items()}
