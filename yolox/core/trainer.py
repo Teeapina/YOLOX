@@ -180,11 +180,6 @@ class Trainer:
 
         self.val_loader = self.exp.get_eval_loader(batch_size=self.args.batch_size, is_distributed=self.is_distributed)
         
-        self.val_criterion = YOLOXLoss(
-            num_classes     = self.exp.num_classes,
-            strides         = self.exp.strides,
-            in_channels     = self.exp.in_channels,
-        ).to(self.device)
         
         # Tensorboard and Wandb loggers
         if self.rank == 0:
