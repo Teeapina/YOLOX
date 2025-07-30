@@ -436,7 +436,6 @@ class Trainer:
             sums["total"] += outs["total_loss"].item()
             sums["iou"]   += outs["iou_loss"].item()
             sums["l1"]    += outs["l1_loss"]
-            sums["obj"]   += outs["obj_loss"].item()
             sums["cls"]   += outs["cls_loss"].item()
 
         n = len(self.val_loader)
