@@ -252,7 +252,7 @@ class Trainer:
 
         if (self.epoch + 1) % self.exp.eval_interval == 0:
             all_reduce_norm(self.model)
-            self.evaluate_and_save_model()
+        self.evaluate_and_save_model()
 
     def before_iter(self):
         pass
@@ -373,6 +373,7 @@ class Trainer:
             (ap50_95, ap50, summary), predictions = self.exp.eval(
                 evalmodel, self.evaluator, self.is_distributed, return_outputs=True
             )
+        stats = getattr(self.evaluator, "coco_stats", {}) or {}
 
         update_best_ckpt = ap50_95 > self.best_ap
         self.best_ap = max(self.best_ap, ap50_95)
@@ -381,6 +382,10 @@ class Trainer:
             if self.args.logger == "tensorboard":
                 self.tblogger.add_scalar("val/COCOAP50", ap50, self.epoch + 1)
                 self.tblogger.add_scalar("val/COCOAP50_95", ap50_95, self.epoch + 1)
+                self.tblogger.add_scalar("val/COCOAP75", stats.get("AP75", float("nan")), self.epoch+1)
+                self.tblogger.add_scalar("val/COCOAR@100", stats.get("AR@100", float("nan")), self.epoch+1)
+                for i, ap in enumerate(getattr(self.evaluator, "per_class_AP_values", [])):
+                    self.tblogger.add_scalar(f"val/AP_class_{i}", ap, self.epoch+1)
             if self.args.logger == "wandb":
                 self.wandb_logger.log_metrics({
                     "val/COCOAP50": ap50,
@@ -399,20 +404,21 @@ class Trainer:
             logger.info("\n" + summary)
         synchronize()
 
-        self.save_ckpt("last_epoch", update_best_ckpt, ap=ap50_95)
-        if self.save_history_ckpt:
-            self.save_ckpt(f"epoch_{self.epoch + 1}", ap=ap50_95)
+        if (self.epoch + 1) % self.exp.eval_interval == 0:
+            self.save_ckpt("last_epoch", update_best_ckpt, ap=ap50_95)
+            if self.save_history_ckpt:
+                self.save_ckpt(f"epoch_{self.epoch + 1}", ap=ap50_95)
 
-        if self.args.logger == "mlflow":
-            metadata = {
-                    "epoch": self.epoch + 1,
-                    "input_size": self.input_size,
-                    'start_ckpt': self.args.ckpt,
-                    'exp_file': self.args.exp_file,
-                    "best_ap": float(self.best_ap)
-                }
-            self.mlflow_logger.save_checkpoints(self.args, self.exp, self.file_name, self.epoch,
-                                                metadata, update_best_ckpt)
+            if self.args.logger == "mlflow":
+                metadata = {
+                        "epoch": self.epoch + 1,
+                        "input_size": self.input_size,
+                        'start_ckpt': self.args.ckpt,
+                        'exp_file': self.args.exp_file,
+                        "best_ap": float(self.best_ap)
+                    }
+                self.mlflow_logger.save_checkpoints(self.args, self.exp, self.file_name, self.epoch,
+                                                    metadata, update_best_ckpt)
 
     
     @torch.no_grad()                       # ──► NO grads, so cost is low

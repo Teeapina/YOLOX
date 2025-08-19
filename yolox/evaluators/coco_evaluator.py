@@ -312,6 +312,43 @@ class COCOEvaluator:
             if self.per_class_AR:
                 AR_table = per_class_AR_table(cocoEval, class_names=cat_names)
                 info += "per class AR:\n" + AR_table + "\n"
+
+            self.coco_eval = cocoEval
+            st = cocoEval.stats  # [AP, AP50, AP75, APs, APm, APl, AR@1, AR@10, AR@100, ARs, ARm, ARl]
+            self.coco_stats = {
+                "AP": float(st[0]),
+                "AP50": float(st[1]),
+                "AP75": float(st[2]),
+                "APs": float(st[3]),
+                "APm": float(st[4]),
+                "APl": float(st[5]),
+                "AR@1": float(st[6]),
+                "AR@10": float(st[7]),
+                "AR@100": float(st[8]),
+                "ARs": float(st[9]),
+                "ARm": float(st[10]),
+                "ARl": float(st[11]),
+            }
+            # Per-class numeric arrays (not just printed tables)
+            precisions = cocoEval.eval.get("precision")  # (T,R,K,A,M)
+            recalls = cocoEval.eval.get("recall")        # (T,K,A,M)
+            if precisions is not None:
+                K = precisions.shape[2]
+                per_class_ap = []
+                for k in range(K):
+                    p = precisions[:, :, k, 0, -1]
+                    p = p[p > -1]
+                    per_class_ap.append(float(p.mean()) if p.size else float("nan"))
+                self.per_class_AP_values = per_class_ap  # len = num_classes
+            if recalls is not None:
+                K = recalls.shape[1]
+                per_class_ar = []
+                for k in range(K):
+                    r = recalls[:, k, 0, -1]
+                    r = r[r > -1]
+                    per_class_ar.append(float(r.mean()) if r.size else float("nan"))
+                self.per_class_AR_values = per_class_ar  # len = num_classes
+
             return cocoEval.stats[0], cocoEval.stats[1], info
         else:
             return 0, 0, info
