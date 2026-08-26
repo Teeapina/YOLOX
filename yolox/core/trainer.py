@@ -98,7 +98,7 @@ class Trainer:
 
         inps, targets = self.prefetcher.next()
         inps = inps.to(self.data_type)
-        targets = targets.to(self.data_type)
+        targets = targets.float()        # was: targets.to(self.data_type)
         targets.requires_grad = False
         inps, targets = self.exp.preprocess(inps, targets, self.input_size)
         data_end_time = time.time()
