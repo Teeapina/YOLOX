@@ -159,7 +159,8 @@ def preproc(img, input_size, swap=(2, 0, 1)):
 
 
 class TrainTransform:
-    def __init__(self, max_labels=50, flip_prob=0.5, hsv_prob=1.0):
+    def __init__(self, max_labels=50, flip_prob=0.5, hsv_prob=1.0, min_box_size=1):
+        self.min_box_size = min_box_size
         self.max_labels = max_labels
         self.flip_prob = flip_prob
         self.hsv_prob = hsv_prob
@@ -189,15 +190,16 @@ class TrainTransform:
         boxes = xyxy2cxcywh(boxes)
         boxes *= r_
 
-        mask_b = np.minimum(boxes[:, 2], boxes[:, 3]) > 1
+        mask_b = np.minimum(boxes[:, 2], boxes[:, 3]) > self.min_box_size
         boxes_t = boxes[mask_b]
         labels_t = labels[mask_b]
 
         if len(boxes_t) == 0:
             image_t, r_o = preproc(image_o, input_dim)
             boxes_o *= r_o
-            boxes_t = boxes_o
-            labels_t = labels_o
+            mask_o = np.minimum(boxes_o[:, 2], boxes_o[:, 3]) > self.min_box_size
+            boxes_t = boxes_o[mask_o]
+            labels_t = labels_o[mask_o]
 
         labels_t = np.expand_dims(labels_t, 1)
 
