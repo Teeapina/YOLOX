@@ -55,6 +55,8 @@ class Exp(BaseExp):
         self.hsv_prob = 1.0
         # prob of applying flip aug
         self.flip_prob = 0.5
+        # boxes with min(w, h) <= this (pixels, after aug) are dropped
+        self.min_box_size = 1
         # rotation angle range, for example, if set to 2, the true range is (-2, 2)
         self.degrees = 10.0
         # translate range, for example, if set to 0.1, the true range is (-0.1, 0.1)
@@ -147,7 +149,8 @@ class Exp(BaseExp):
             preproc=TrainTransform(
                 max_labels=50,
                 flip_prob=self.flip_prob,
-                hsv_prob=self.hsv_prob
+                hsv_prob=self.hsv_prob,
+                min_box_size=self.min_box_size,
             ),
             cache=cache,
             cache_type=cache_type,
@@ -188,7 +191,8 @@ class Exp(BaseExp):
             preproc=TrainTransform(
                 max_labels=120,
                 flip_prob=self.flip_prob,
-                hsv_prob=self.hsv_prob),
+                hsv_prob=self.hsv_prob,
+                min_box_size=self.min_box_size),
             degrees=self.degrees,
             translate=self.translate,
             mosaic_scale=self.mosaic_scale,
