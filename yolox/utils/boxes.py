@@ -80,6 +80,13 @@ def bboxes_iou(bboxes_a, bboxes_b, xyxy=True):
     if bboxes_a.shape[1] != 4 or bboxes_b.shape[1] != 4:
         raise IndexError
 
+    # fp16 cannot represent box corners accurately at input sizes >= 1024
+    # (ulp = 1.0 in [1024, 2048)); rounding of (c +/- wh/2) lets the computed
+    # intersection exceed the box areas, so area_a + area_b - area_i collapses
+    # and the ratio blows past 1. Always evaluate in fp32.
+    dtype = bboxes_a.dtype
+    bboxes_a, bboxes_b = bboxes_a.float(), bboxes_b.float()
+
     if xyxy:
         tl = torch.max(bboxes_a[:, None, :2], bboxes_b[:, :2])
         br = torch.min(bboxes_a[:, None, 2:], bboxes_b[:, 2:])
@@ -98,8 +105,9 @@ def bboxes_iou(bboxes_a, bboxes_b, xyxy=True):
         area_a = torch.prod(bboxes_a[:, 2:], 1)
         area_b = torch.prod(bboxes_b[:, 2:], 1)
     en = (tl < br).type(tl.type()).prod(dim=2)
-    area_i = torch.prod(br - tl, 2) * en  # * ((tl < br).all())
-    return area_i / (area_a[:, None] + area_b - area_i)
+    area_i = torch.prod(br - tl, 2) * en
+    iou = area_i / (area_a[:, None] + area_b - area_i).clamp(min=1e-12)
+    return iou.clamp(0, 1).to(dtype)
 
 
 def matrix_iou(a, b):
